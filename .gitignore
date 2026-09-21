@@ -1,0 +1,10 @@
+*.pyc
+__pycache__/
+.DS_Store
+*.log
+secrets/*.txt
+*.pem
+*_key*
+.env
+state.json
+cookies.txt
