@@ -34,7 +34,7 @@ def fetch(url):
         return json.loads(r.read().decode())
 
 def premium_of(t):
-    count = int(t.get("count_fp", 0))
+    count = float(t.get("count_fp", 0) or 0)
     side = t.get("taker_side", "?")
     if side == "no":
         # NO contract: actual premium = count * no_price
