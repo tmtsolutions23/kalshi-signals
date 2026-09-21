@@ -21,6 +21,28 @@ MAX_PAGES = 20               # per trader
 MIN_MOVE_USD = 2000
 MIN_HOLD_USD = 5000
 
+MONTHS = {"JAN":1,"FEB":2,"MAR":3,"APR":4,"MAY":5,"JUN":6,
+          "JUL":7,"AUG":8,"SEP":9,"OCT":10,"NOV":11,"DEC":12}
+
+def market_is_alive(ticker):
+    """Check if the event date encoded in a Kalshi ticker is still current.
+    Returns True if likely still open (within 36h), False if event passed (settled).
+    Unknown-format tickers default to True."""
+    import re
+    m = re.search(r'-(\d{2})([A-Z]{3})(\d{2})', ticker)
+    if not m:
+        return True
+    yy = 2000 + int(m.group(1))
+    mon = MONTHS.get(m.group(2))
+    if mon is None:
+        return True
+    dd = int(m.group(3))
+    try:
+        event_date = datetime(yy, mon, dd, tzinfo=timezone.utc)
+    except ValueError:
+        return True
+    return datetime.now(timezone.utc) - event_date < timedelta(hours=36)
+
 def load_tokens():
     cook = open(SE+"kalshi_cookies.txt").read()
     waf = open(SE+"kalshi_waf_token.txt").read()
@@ -235,6 +257,14 @@ for (tick, side), entries in hold_positions.items():
         if net > 0 and usd >= MIN_HOLD_USD:
             big_holds.append((tick, side, whale, net, vwap, usd))
 big_holds.sort(key=lambda x: -x[5])
+
+# 3c. Filter settled markets — only show markets whose event is still active
+moves = [(t, s, e, tot) for (t, s, e, tot) in moves if market_is_alive(t)]
+hold_consensus = [(t, s, e, tot) for (t, s, e, tot) in hold_consensus if market_is_alive(t)]
+big_holds = [(t, s, w, n, v, u) for (t, s, w, n, v, u) in big_holds if market_is_alive(t)]
+# Recompute fired — consensus requires at least 2 directional whales on same live market+side
+fired = sum(1 for (tick, side), entries in fresh_consensus.items()
+            if len({e[0] for e in entries if e[0] in directional}) >= 2 and market_is_alive(tick))
 
 # 5. Output — ONLY if there are copy-trade signals
 out = []
