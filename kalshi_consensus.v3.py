@@ -309,9 +309,15 @@ for nick in directional:
         hold_pos[(ticker, side)].append((nick, h["net"], h["vwap"]))
 
 # ---- 5. enrich / settled filter / dedupe ----
+# Fresh-buy signals (C|/S|) live in the FRESH_H window; holdings signals (H|/B|)
+# track positions over HOLD_H and should only re-fire on that slower cadence,
+# not get pruned (and immediately re-fire) every FRESH_H like fresh buys do.
+def _sig_ttl(sig):
+    return HOLD_H if sig[:1] in ("H", "B") else FRESH_H
+
 state = load_state()
 state = {sig: ts for sig, ts in state.items()
-         if now_utc - datetime.fromisoformat(ts) < timedelta(hours=FRESH_H)}
+         if now_utc - datetime.fromisoformat(ts) < timedelta(hours=_sig_ttl(sig))}
 fired_c, fired_m = [], []
 for ticker, side, entries, total in consensus:
     m = enrich(ticker)
